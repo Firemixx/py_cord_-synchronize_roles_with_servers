@@ -29,38 +29,40 @@ async def sync_roles():
     log.info("Старт проверки и синхронизации")
     guilds = [bot.get_guild(g) for g in guildslist if bot.get_guild(g)]
     for guild in guilds:
-        for member in (m for m in guild.members if any(r.id in guildlistAndRoles[guild.id] for r in m.roles)):
-            if member.bot:
-                continue
-            member_role_ids = [r.id for r in member.roles]
-            tasks = []
-            for r_id in member_role_ids:
-                if r_id not in guildlistAndRoles[guild.id]:
+        for r in guildlistAndRoles[guild.id]:
+            role=discord.utils.get(guild.roles,id=r)
+            for member in role.members:
+                if member.bot:
                     continue
-                idx = guildlistAndRoles[guild.id].index(r_id)
-                for target_guild_id, role_list in guildlistAndRoles.items():
-                    target_guild = bot.get_guild(target_guild_id)
-                    if not target_guild:
+                member_role_ids = [r.id for r in member.roles]
+                tasks = []
+                for r_id in member_role_ids:
+                    if r_id not in guildlistAndRoles[guild.id]:
                         continue
-                    if idx >= len(role_list):
-                        continue
-                    target_role_id = role_list[idx]
-                    target_member = target_guild.get_member(member.id)
-                    if not target_member:
-                        continue
-                    target_role = target_guild.get_role(target_role_id)
-                    if not target_role:
-                        continue
-                    if all(r.id != target_role.id for r in target_member.roles):
-                        tasks.append(target_member.add_roles(target_role, reason="Синхронизация ролей"))
+                    idx = guildlistAndRoles[guild.id].index(r_id)
+                    for target_guild_id, role_list in guildlistAndRoles.items():
+                        target_guild = bot.get_guild(target_guild_id)
+                        if not target_guild:
+                            continue
+                        if idx >= len(role_list):
+                            continue
+                        target_role_id = role_list[idx]
+                        target_member = target_guild.get_member(member.id)
+                        if not target_member:
+                            continue
+                        target_role = target_guild.get_role(target_role_id)
+                        if not target_role:
+                            continue
+                        if all(r.id != target_role.id for r in target_member.roles):
+                            tasks.append(target_member.add_roles(target_role, reason="Синхронизация ролей"))
 
-            if tasks:
-                try:
-                    await asyncio.gather(*tasks)
-                    log.info(f"Синхронизация:{member.name} получил новые роли на сервер(ах).")
-                except discord.Forbidden:
-                    log.error("Синхронизация:Нет прав выдать одну из ролей")
-            log.info('Синхронизация:Прошла успешно')
+                if tasks:
+                    try:
+                        await asyncio.gather(*tasks)
+                        log.info(f"Синхронизация:{member.name} получил новые роли на сервер(ах).")
+                    except discord.Forbidden:
+                        log.error("Синхронизация:Нет прав выдать одну из ролей")
+                log.info('Синхронизация:Прошла успешно')
 
 
 @bot.event
