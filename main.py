@@ -29,7 +29,7 @@ async def sync_roles():
     log.info("Старт проверки и синхронизации")
     guilds = [bot.get_guild(g) for g in guildslist if bot.get_guild(g)]
     for guild in guilds:
-        for member in guild.members:
+        for member in (m for m in guild.members if any(r.id in guildlistAndRoles[guild.id] for r in m.roles)):
             if member.bot:
                 continue
             member_role_ids = [r.id for r in member.roles]
@@ -60,6 +60,8 @@ async def sync_roles():
                     log.info(f"Синхронизация:{member.name} получил новые роли на сервер(ах).")
                 except discord.Forbidden:
                     log.error("Синхронизация:Нет прав выдать одну из ролей")
+            log.info('Синхронизация:Прошла успешно')
+
 
 @bot.event
 async def on_ready():
@@ -70,35 +72,33 @@ async def on_ready():
 @bot.event
 async def on_member_update(before: discord.Member, after: discord.Member):
     await configurated_logging(level=logging.INFO)
-    guilds = [bot.get_guild(g) for g in guildslist if bot.get_guild(g)]
-    for guild in guilds:
-            member_role_ids = [r.id for r in after.roles]
-            tasks = []
-            for r_id in member_role_ids:
-                if r_id not in guildlistAndRoles[guild.id]:
-                    continue
-                idx = guildlistAndRoles[guild.id].index(r_id)
-                for target_guild_id, role_list in guildlistAndRoles.items():
-                    target_guild = bot.get_guild(target_guild_id)
-                    if not target_guild:
-                        continue
-                    if idx >= len(role_list):
-                        continue
-                    target_role_id = role_list[idx]
-                    target_member = target_guild.get_member(after.id)
-                    if not target_member:
-                        continue
-                    target_role = target_guild.get_role(target_role_id)
-                    if not target_role:
-                        continue
-                    if all(r.id != target_role.id for r in target_member.roles):
-                        tasks.append(target_member.add_roles(target_role, reason="Синхронизация ролей при изменении"))
+    tasks = []
+    aroles=after.roles
+    for ar in aroles:
+        if ar.id not in guildlistAndRoles[after.guild.id]:
+            continue
+        idx = guildlistAndRoles[after.guild.id].index(ar.id)
+        for target_guild_id, role_list in guildlistAndRoles.items():
+            target_guild = bot.get_guild(target_guild_id)
+            if not target_guild:
+                continue
+            if idx >= len(role_list):
+                continue
+            target_role_id = role_list[idx]
+            target_member = target_guild.get_member(after.id)
+            if not target_member:
+                continue
+            target_role = target_guild.get_role(target_role_id)
+            if not target_role:
+                continue
+            if all(r.id != target_role.id for r in target_member.roles):
+                tasks.append(target_member.add_roles(target_role, reason="Синхронизация ролей при изменении"))
 
-            if tasks:
-                try:
-                    await asyncio.gather(*tasks)
-                    log.info(f"Синхронизация при изменении:{after.name} получил новые роли на серверах из списка.")
-                except discord.Forbidden:
-                    log.error("Синхронизация при изменении:Нет прав выдать одну из ролей")
+        if tasks:
+            try:
+                await asyncio.gather(*tasks)
+                log.info(f"Синхронизация при изменении:{after.name} получил новые роли на серверах из списка.")
+            except discord.Forbidden:
+                log.error("Синхронизация при изменении:Нет прав выдать одну из ролей")
 
 bot.run(os.getenv('TOKEN')) # run the bot with the token
